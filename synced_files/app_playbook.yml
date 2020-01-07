@@ -1,0 +1,62 @@
+---
+- hosts: all
+  become: yes
+  environment:
+    DB_HOST: "mongodb://192.168.10.150:27017/posts"
+  tasks:
+    - name: update and upgrade ubuntu
+      apt:
+        update_cache: yes
+        upgrade: yes
+    - name: ensure nginx is at latest version
+      apt: name=nginx state=latest
+    - name: start nginx
+      service:
+          name: nginx
+          state: started
+   # - name: install git
+   #    apt: name=git state=latest
+    - name: install python-software-properties
+      apt: name=python-software-properties state=latest
+    - name: get nodejs GPG key
+      apt_key:
+        url: "https://deb.nodesource.com/gpgkey/nodesource.gpg.key"
+        state: present
+    - name: get nodejs repo
+      apt_repository:
+        repo: "deb https://deb.nodesource.com/node_6.x xenial main"
+        state: present
+    - name: install nodejs
+      apt: name=nodejs state=latest force=yes
+    - name: install packages
+      npm:
+        path: /home/ubuntu/synced_files/app
+  #check  - name: install packages
+    # - name: install npm
+    #   apt: name=npm state=latest
+    - name: install pm2
+      npm: name=pm2 global=yes
+    - name: proxy remove default
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+    - name: link proxy sites available
+      file:
+        src: /home/ubuntu/synced_files/reverse-proxy.conf
+        dest: /etc/nginx/sites-available/reverse-proxy.conf
+        state: link
+    - name: link proxy sites enabled
+      file:
+        src: /etc/nginx/sites-available/reverse-proxy.conf
+        dest: /etc/nginx/sites-enabled/reverse-proxy.conf
+        state: link
+    - name: restart nginx with proxy
+      service:
+        name: nginx
+        state: restarted
+    - name: seed application
+      shell: chdir=/home/ubuntu/synced_files/app cmd= sudo node seeds/seed.js
+        # chdir: /home/ubuntu/synced_files/app/seeds
+        # cmd: node seed.js
+    - name: application running
+      shell: chdir=/home/ubuntu/synced_files/app cmd= node app.js
